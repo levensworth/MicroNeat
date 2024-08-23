@@ -41,7 +41,7 @@ class CONFIG:
     disjoint_genes_coefficient=1
     weight_difference_coefficient=0.5
     # speciation
-    species_distance_threshold=2
+    species_distance_threshold=1
     species_elitism_threshold=5
     species_no_improvement_limit=15
     # others
@@ -52,9 +52,8 @@ class CONFIG:
 
 class Population:
     
-    def __init__(self, size: int, n_inputs: int, n_outputs: int,) -> None:
+    def __init__(self, size: int, n_inputs: int, n_outputs: int, with_bias: bool = False) -> None:
         self._size = size
-        with_bias = False
         self._base_genome = Genome.from_inputs_and_outputs(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
@@ -143,6 +142,7 @@ class Population:
                 self._mass_extinction_counter = 0
                 self.genomes = [best] + [self._random_genome_with_extras()
                                          for _ in range(self._size - 1)]
+                print('mass extinction')
                 assert len(self.genomes) == self._size
             else:
                 # reproduction

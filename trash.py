@@ -107,17 +107,22 @@ def fitness_function(genome: Genome, log=False):
     return (1 / error) if error > 0 else 0
 
 population = Population(
-    size=50,
+    size=200,
     n_inputs=N_INPUTS,
-    n_outputs=1
+    n_outputs=1,
+    with_bias=True
 )
 
 
-population.evolve(100, fitness_function)
+population.evolve(10, fitness_function)
 
-print(population.fittest().apply([1] * N_INPUTS))
+for inp in xor_inputs:
+    print(f'input: {inp}')
+    print(population.fittest().apply(inp))
 
 visualize_genome(population.fittest())
+
+print(population.fittest().get_nodes())
 
 # genome = Genome.from_inputs_and_outputs(2, 1)
 # for _ in range(10):

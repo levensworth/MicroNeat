@@ -33,11 +33,18 @@ def visualize_genome(genome: Genome) -> None:
     # Create edges for the DAG
     edge_trace = []
     for edge in connections:
+        # cap the width to visual pleasing format
+        line_width = abs(2*edge.value)
+        if line_width > 2:
+            line_width = 2
+        if line_width < 0.1:
+            line_width = 0.1
+
         edge_trace.append(go.Scatter(
             x=[edge.x_src, edge.x_dst, None],
             y=[edge.y_src, edge.y_dst, None],
             mode='lines',
-            line=dict(width=abs(2*edge.value), color='blue'),
+            line=dict(width=line_width, color='blue'),
             text=edge.value,
             hovertext='text'
         ))
@@ -90,9 +97,11 @@ def map_to_layers(genome: Genome) -> list[list[NodeGene]]:
         list[list[NodeGene]]: _description_
     """
     layers: list[list[NodeGene]] = []
-    layers.append(genome.input_nodes)
+    layers.append(genome.input_nodes + ([genome.bias_node] if genome.bias_node is not None else []))
     
     visited: set[NodeGene] = set(genome.input_nodes)    
+    if genome.bias_node is not None:
+        visited.add(genome.bias_node)
     queue: list[tuple[NodeGene, int]] = []
     queue_lookup = {}
     # init queue with direct links of inputs
@@ -122,7 +131,7 @@ def map_to_layers(genome: Genome) -> list[list[NodeGene]]:
 
         lvl = queue_lookup[current]
         # add outputs to queue
-        for con in current.get_connections_out():
+        for con in genome.get_node_connections_out(current):
             if con.get_destination_node().get_type() == NodeGene.NodeTypeEnum.OUTPUT:
                 continue
 
@@ -134,7 +143,7 @@ def map_to_layers(genome: Genome) -> list[list[NodeGene]]:
 
         # check fon unseen inputs
         has_unseen_inputs = False
-        for con in current.get_connections_in():
+        for con in genome.get_node_connections_in(current):
             if con.get_source_node() in visited:
                 continue
 
@@ -191,8 +200,11 @@ def map_to_layers(genome: Genome) -> list[list[NodeGene]]:
 def map_layer_to_graph(layer: list[NodeGene], layer_number: int, max_width: int) -> list[GraphNode]:
     graph_nodes: list[GraphNode] = []
     y_delta = 2
-    x_delta = max_width//len(layer)
-    for idx, node in enumerate(layer):
+    if len(layer) > 1:
+        x_delta = max_width//len(layer)
+    else:
+        x_delta = max_width // 2
+    for idx, node in enumerate(layer, start=1):
         graph_nodes.append(GraphNode(
             x_pos=x_delta * idx + random.random() * 1,
             y_pos=y_delta * layer_number,
@@ -226,13 +238,13 @@ def map_connections(connections: list[ConnectionGene], nodes: list[GraphNode]) -
     return conns
 
 
-def has_connections_to(node: NodeGene, dst_nodes: list[NodeGene]) -> bool:
-    node_inputs = set([con.get_source_node().get_id() for con in node.get_connections_in()])
-    for node in dst_nodes:
-        if node.get_id() in node_inputs:
-            return True
+# def has_connections_to(node: NodeGene, dst_nodes: list[NodeGene]) -> bool:
+#     node_inputs = set([con.get_source_node().get_id() for con in node.get_connections_in()])
+#     for node in dst_nodes:
+#         if node.get_id() in node_inputs:
+#             return True
     
-    return False
+#     return False
     
     
         

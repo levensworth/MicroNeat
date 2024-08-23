@@ -21,8 +21,8 @@ class NeuralNetwork:
         for value, node in zip(inputs, self._genome.input_nodes):
             self._activation_lookup[node.get_id()] = node.activate(value)
         
-        # if self._genome.bias_node is not None:
-        #     self._activation_lookup[self._genome.bias_node.get_id()] = self._genome.bias_node.activate(1)
+        if self._genome.bias_node is not None:
+            self._activation_lookup[self._genome.bias_node.get_id()] = self._genome.bias_node.activate(1)
 
         for node in self._genome.output_nodes:
             try:
@@ -37,7 +37,7 @@ class NeuralNetwork:
     def _apply_computation(self, current_node: "NodeGene") -> float:
         current_value = 0.0
         self._activation_lookup[current_node.get_id()] = 0 # this is a measure to stop looping forever
-        for con in current_node.get_connections_in():
+        for con in self._genome.get_node_connections_in(current_node):
             if not con.is_enabled:
                 continue
             if con.get_source_node().get_id() in self._activation_lookup:

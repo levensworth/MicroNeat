@@ -1,4 +1,3 @@
-import functools
 import enum
 import typing
 
@@ -32,21 +31,7 @@ class NodeGene:
             pass
         return self._activation_func(value)
     
-    def add_input_connection(self, connection: 'ConnectionGene') -> None:
-        assert connection.get_destination_node().get_id() == self.get_id(), 'trying to add an input connection where the node is not the destination'
-        self._connections_in.append(connection)
-
-    def add_output_connection(self, connection: 'ConnectionGene') -> None:
-        assert connection.get_source_node().get_id() == self.get_id(), 'trying to add an output connection where the node is not the source'
-        self._connections_out.append(connection)
-
-    def get_connections_in(self) -> list['ConnectionGene']:
-        return self._connections_in
-    
-    def get_connections_out(self) -> list['ConnectionGene']:
-        return self._connections_out
-    
-    def copy(self, include_connections: bool = True) -> "NodeGene":
+    def copy(self,) -> "NodeGene":
         """Returns a shallow copy of the node, without it's connections.
 
         Returns:
@@ -57,17 +42,16 @@ class NodeGene:
             node_type=self._type,
             activation_func=self._activation_func
         )
-        if include_connections:
-            list(map(new_node.add_input_connection, self.get_connections_in()))
-            list(map(new_node.add_output_connection, self.get_connections_out()))
+
         return new_node
     
     def __repr__(self) -> str:
-        return f'Node(id={self.get_id()} | type={self.get_type()} | count_in={len(self.get_connections_in())} | count_out={len(self.get_connections_out())})'
+        return f'Node(id={self.get_id()} | type={self.get_type()}'
     
 
 class ConnectionGene:
     def __init__(self, connection_id: int, source_node: NodeGene, destination_node: NodeGene, weight: float, is_enabled: bool = True) -> None:
+        assert destination_node.get_type() != NodeGene.NodeTypeEnum.BIAS, 'you can not create a in connection to a bias node'
         self._id = connection_id
         self._src_node = source_node
         self._dst_node = destination_node

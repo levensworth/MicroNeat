@@ -1,4 +1,5 @@
 
+from copy import copy
 from dataclasses import dataclass
 import numpy as np
 from src import utils
@@ -19,6 +20,12 @@ def sigmoid(x: float,
     x = np.clip(x, -clip_value, clip_value)
     return 1 / (1 + np.exp(-x))
 
+def bool_function(x: float) -> float:
+    if x > 0.5:
+        return 1
+    else:
+        return 0
+
 
 DEFAULT_ACTIVATION_FUNC = linear_activation
 
@@ -26,7 +33,7 @@ DEFAULT_ACTIVATION_FUNC = linear_activation
 
 @dataclass
 class CONFIG:
-    out_nodes_activation=sigmoid
+    out_nodes_activation=bool_function
     hidden_nodes_activation=sigmoid
     bias_value=1
     # reproduction
@@ -37,7 +44,7 @@ class CONFIG:
     enable_connection_mutation_chance=(0.03, 0.3)
     disable_inherited_connection_chance=0.75
     mating_chance=0.7
-    interspecies_mating_chance=0.05
+    interspecies_mating_chance=0.1
     rank_prob_dist_coefficient=1.75
     # weight mutation specifics
     weight_perturbation_pc=(0.1, 0.4)
@@ -77,7 +84,7 @@ class Genome:
         self.input_nodes: list[NodeGene] = input_nodes  
         self.hidden_nodes: list[NodeGene] = hidden_nodes
         self.output_nodes: list[NodeGene] = output_nodes
-
+        self.bias_node = bias_node
         self.connections: list[ConnectionGene] = connections
     
     @classmethod
@@ -95,8 +102,9 @@ class Genome:
         return input_nodes
     
     @classmethod
-    def _create_output_nodes(cls, n_outputs: int, input_nodes: list[NodeGene]) -> list[NodeGene]:
+    def _create_output_nodes(cls, n_outputs: int, input_nodes: list[NodeGene], bias_node: NodeGene | None) -> list[NodeGene]:
         node_counter = len(input_nodes)
+        node_counter += 1 if bias_node is not None else 0
         output_nodes: list[NodeGene] = []
 
         for _ in range(n_outputs):
@@ -128,19 +136,21 @@ class Genome:
     @classmethod
     def from_inputs_and_outputs(cls, n_inputs: int, n_outputs: int, with_bias: bool = False) -> "Genome":
         input_nodes: list[NodeGene] = cls._create_input_nodes(n_inputs)
-        hidden_nodes: list[NodeGene] = []
-        output_nodes: list[NodeGene] = cls._create_output_nodes(n_outputs, input_nodes=input_nodes)
-
-        connections: list[ConnectionGene] = cls._create_connections(input_nodes, output_nodes)
-        
         if with_bias:
             bias = NodeGene(
-             node_id=len(input_nodes) + len(output_nodes) + 1,
+             node_id=len(input_nodes),
              node_type=NodeGene.NodeTypeEnum.BIAS,
              activation_func=linear_activation,   
             )
         else:
             bias = None
+
+        hidden_nodes: list[NodeGene] = []
+        output_nodes: list[NodeGene] = cls._create_output_nodes(n_outputs, input_nodes=input_nodes, bias_node=bias)
+        
+        connection_sources = input_nodes + ([bias] if bias is not None else [])
+        connections: list[ConnectionGene] = cls._create_connections(connection_sources, output_nodes)
+        
 
         return Genome(
             input_nodes,
@@ -151,17 +161,17 @@ class Genome:
         )
 
     @classmethod
-    def from_connections(self, connections: list[ConnectionGene]) -> "Genome":
+    def from_connections(cls, connections: list[ConnectionGene]) -> "Genome":
         input_nodes_dict: dict[int, NodeGene] = {}
         hidden_nodes_dict: dict[int, NodeGene] = {}
         output_nodes_dict: dict[int, NodeGene] = {}
         bias_node = None
-        
+
         node_lookup_table: dict[int, NodeGene] = {}
         # extract all nodes
         for con in connections:
             for node in [con.get_source_node(),con.get_destination_node()]:
-                new_node = node.copy(include_connections=False)
+                new_node = node.copy()
                 node_lookup_table[new_node.get_id()] = new_node
                 match node.get_type():
                     case NodeGene.NodeTypeEnum.INPUT:
@@ -180,7 +190,7 @@ class Genome:
         # re populate connections
         for con in connections:
             try:
-                new_connections.append(self._create_connection(
+                new_connections.append(cls._create_connection(
                     connection_id=con.get_id(),
                     src_node=node_lookup_table[con.get_source_node().get_id()],
                     dst_node=node_lookup_table[con.get_destination_node().get_id()],
@@ -216,7 +226,7 @@ class Genome:
         result += self.input_nodes
         result += self.hidden_nodes
         result += self.output_nodes
-        # result += [self.bias_node] if self.bias_node else  []
+        result += [self.bias_node] if self.bias_node else  []
         return result
     
     def mate(self, other: 'Genome') -> 'Genome':
@@ -250,7 +260,7 @@ class Genome:
                     enabled = not utils.chance(
                         CONFIG.disable_inherited_connection_chance)
                     
-                copied_connection = self.copy_connections([c], with_random_weights=False)[0]
+                copied_connection = copy(c) # this is a shallow copy because I just don't want to overwrite the enablement
                 copied_connection.is_enabled = enabled
                 chosen_connections.append(copied_connection)
         
@@ -261,7 +271,11 @@ class Genome:
         for connection in self.connections:
             # TODO: check if maybe introduce more change
             if utils.chance(CONFIG.weight_reset_chance):
-                # add perturbation
+                # perturbing the connection
+                connection.weight = np.random.uniform(
+                    *CONFIG.new_weight_interval)
+            else:
+                # resetting the connection
                 p = np.random.uniform(low=-CONFIG.weight_perturbation_pc[0],
                                       high=CONFIG.weight_perturbation_pc[1])
                 d = connection.weight * p
@@ -360,21 +374,37 @@ class Genome:
     
     def copy_with_random_weights(self) -> 'Genome':
         
+        input_nodes=self.copy_nodes(self.input_nodes)
+        output_nodes=self.copy_nodes(self.output_nodes)
+        hidden_nodes=self.copy_nodes(self.hidden_nodes)
+        bias_node=self.copy_nodes([self.bias_node])[0] if self.bias_node else None
+
+        new_nodes = [] + input_nodes + output_nodes + hidden_nodes
+        new_nodes += [bias_node] if bias_node is not None else []
         return Genome(
-            input_nodes=self.copy_nodes(self.input_nodes),
-            output_nodes=self.copy_nodes(self.output_nodes),
-            hidden_nodes=self.copy_nodes(self.hidden_nodes),
-            connections=self.copy_connections(self.connections, with_random_weights=True),
-            # bias_node=self.copy_nodes([self.bias_node])[0] if self.bias_node else None
+            input_nodes=input_nodes,
+            hidden_nodes=hidden_nodes,
+            output_nodes=output_nodes,
+            bias_node=bias_node,
+            connections=self.copy_connections(self.connections,new_nodes=new_nodes ,with_random_weights=True),
+            
         )
     
     def clone(self) -> 'Genome':
+        input_nodes=self.copy_nodes(self.input_nodes)
+        output_nodes=self.copy_nodes(self.output_nodes)
+        hidden_nodes=self.copy_nodes(self.hidden_nodes)
+        bias_node=self.copy_nodes([self.bias_node])[0] if self.bias_node else None
+
+        new_nodes = [] + input_nodes + output_nodes + hidden_nodes
+        new_nodes += [bias_node] if bias_node is not None else []
+
         return Genome(
-            input_nodes=self.copy_nodes(self.input_nodes),
-            output_nodes=self.copy_nodes(self.output_nodes),
-            hidden_nodes=self.copy_nodes(self.hidden_nodes),
-            connections=self.copy_connections(self.connections, with_random_weights=False),
-            # bias_node=self.copy_nodes([self.bias_node])[0] if self.bias_node else None
+            input_nodes=input_nodes,
+            hidden_nodes=hidden_nodes,
+            output_nodes=output_nodes,
+            bias_node=bias_node,
+            connections=self.copy_connections(self.connections, new_nodes=new_nodes, with_random_weights=False),
         )
 
     def add_random_hidden_node(self, id_handler: IDHandler) -> NodeGene | None:
@@ -438,7 +468,8 @@ class Genome:
         """
         for out_node in self.output_nodes:
             valid = False
-            for in_con in out_node.get_connections_in():
+            connections = [con for con in self.connections if con.get_destination_node() == out_node]
+            for in_con in connections:
                 if in_con.is_enabled:
                     valid = True
                     break
@@ -459,7 +490,8 @@ class Genome:
         """
         for in_node in self.input_nodes:
             valid = False
-            for out_con in in_node.get_connections_out():
+            connections = [con for con in self.connections if con.get_source_node() == in_node]
+            for out_con in connections:
                 if out_con.is_enabled:
                     valid = True
                     break
@@ -471,7 +503,7 @@ class Genome:
     @classmethod
     def _create_connection_with_random_weights(cls, connection_id: int, src_node: NodeGene, dst_node: NodeGene) -> ConnectionGene:
         weight = np.random.uniform(*CONFIG.new_weight_interval)
-        return cls._create_connection(connection_id, src_node, dst_node, weight)
+        return cls._create_connection(connection_id, src_node, dst_node, weight, is_enabled=True)
 
 
     @classmethod
@@ -491,8 +523,8 @@ class Genome:
             is_enabled=is_enabled
         )
         
-        src_node.add_output_connection(connection)
-        dst_node.add_input_connection(connection)
+        # src_node.add_output_connection(connection)
+        # dst_node.add_input_connection(connection)
         return connection
     
     
@@ -501,20 +533,25 @@ class Genome:
         return [node.copy() for node in nodes]
     
     
-    def copy_connections(self, connections: list[ConnectionGene], with_random_weights: bool) -> list[ConnectionGene]:
+    def copy_connections(self, connections: list[ConnectionGene],  new_nodes: list[NodeGene], with_random_weights: bool) -> list[ConnectionGene]:
         new_connections: list[ConnectionGene] = []
+        nodes_lookup = {node.get_id() : node for node in new_nodes}
+
         for connection in connections:
+
+            if nodes_lookup[connection.get_destination_node().get_id()].get_type() != connection.get_destination_node().get_type():
+                print("here")
             if with_random_weights:
                 new_conn = self._create_connection_with_random_weights(
                     connection_id=connection.get_id(),
-                    src_node=connection.get_source_node(),
-                    dst_node=connection.get_destination_node(),
+                    src_node=nodes_lookup[connection.get_source_node().get_id()],
+                    dst_node=nodes_lookup[connection.get_destination_node().get_id()],
                 )
             else:
                 new_conn = self._create_connection(
                     connection_id=connection.get_id(),
-                    src_node=connection.get_source_node(),
-                    dst_node=connection.get_destination_node(),
+                    src_node=nodes_lookup[connection.get_source_node().get_id()],
+                    dst_node=nodes_lookup[connection.get_destination_node().get_id()],
                     weight=connection.weight
                 )
                 
@@ -524,8 +561,20 @@ class Genome:
         return new_connections
     
     def does_connection_exists(self, src_node: NodeGene, dst_node: NodeGene) -> bool:
-        for con in src_node.get_connections_out():
-            if con.get_destination_node().get_id() == dst_node.get_id():
+        # for con in src_node.get_connections_out():
+        #     if con.get_destination_node().get_id() == dst_node.get_id():
+        #         return True
+            
+        # return False
+
+        for con in self.connections:
+            if con.get_source_node() == src_node and con.get_destination_node() == dst_node:
                 return True
             
         return False
+    
+    def get_node_connections_in(self, node: NodeGene) -> list[ConnectionGene]:
+        return [con for con in self.connections if con.get_destination_node() == node]
+    
+    def get_node_connections_out(self, node: NodeGene) -> list[ConnectionGene]:
+        return [con for con in self.connections if con.get_source_node() == node]
