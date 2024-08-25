@@ -10,6 +10,7 @@ python = "~3.11"
 flappy-bird-env = "^0.1.6"
 flappy-bird-gymnasium = "^0.4.0"
 plotly = "^5.23.0"
+tqdm = "^4.66.5"
 
 
 

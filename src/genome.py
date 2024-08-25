@@ -33,7 +33,7 @@ DEFAULT_ACTIVATION_FUNC = linear_activation
 
 @dataclass
 class CONFIG:
-    out_nodes_activation=bool_function
+    out_nodes_activation=sigmoid
     hidden_nodes_activation=sigmoid
     bias_value=1
     # reproduction
@@ -71,6 +71,7 @@ class CONFIG:
     reset_innovations_period=5
     allow_self_connections=True
     initial_node_activation=0
+
 
 
 

@@ -114,7 +114,7 @@ population = Population(
 )
 
 
-population.evolve(10, fitness_function)
+population.evolve(100, fitness_function)
 
 for inp in xor_inputs:
     print(f'input: {inp}')

@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
-
+from tqdm import tqdm
 import typing
 from src import utils
 from src.genes import NodeGene
@@ -25,7 +25,7 @@ class CONFIG:
     rank_prob_dist_coefficient=1.75
     # weight mutation specifics
     weight_perturbation_pc=(0.1, 0.4)
-    weight_reset_chance= 0.3
+    weight_reset_chance=(0.1, 0.3)
     new_weight_interval=(-2, 2)
     # mass extinction
     mass_extinction_threshold=15
@@ -49,11 +49,41 @@ class CONFIG:
     allow_self_connections=True
     initial_node_activation=0
 
+    _maex_cache: dict[str, float] = field(default_factory=dict)
+    _maex_counter = 0
+
+    #: Name of the attributes whose values change according to the mass
+    #:  extinction counter (type: Tuple[float, float]).
+    MAEX_KEYS = {"weight_mutation_chance",
+                 "new_node_mutation_chance",
+                 "new_connection_mutation_chance",
+                 "enable_connection_mutation_chance",
+                 "weight_perturbation_pc",
+                 "weight_reset_chance"}
+
+    def update_mass_extinction(self, maex_counter: int) -> None:
+        """ Updates the mutation chances based on the current value of the mass
+        extinction counter (generations without improvement).
+
+        Args:
+            maex_counter (int): Current value of the mass extinction counter
+                (generations without improvement).
+        """
+        self._maex_counter = maex_counter
+        for k in type(self).MAEX_KEYS:
+            base_value, max_value = getattr(self, k)
+            unit = (max_value - base_value) / self.mass_extinction_threshold
+            self._maex_cache[k] = (base_value + unit * maex_counter)
+
 
 class Population:
     
     def __init__(self, size: int, n_inputs: int, n_outputs: int, with_bias: bool = False) -> None:
         self._size = size
+
+        self._config = CONFIG()
+
+
         self._base_genome = Genome.from_inputs_and_outputs(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
@@ -68,8 +98,9 @@ class Population:
 
         self._cached_rank_prob_dist = utils.rank_prob_dist(
                             size=size, 
-                            coefficient=CONFIG.rank_prob_dist_coefficient
+                            coefficient=self._config.rank_prob_dist_coefficient
             )
+        
 
 
         # creating initial genomes
@@ -92,7 +123,10 @@ class Population:
         for generation_num in range(generations):
         
             # calculating fitness
-            fitness_results = [fitness_function(gen) for gen in self.genomes]
+            fitness_results = []
+            for gen in tqdm(self.genomes):
+                
+                fitness_results.append(fitness_function(gen))
 
             # assigning fitness and adjusted fitness
             for genome, fitness in zip(self.genomes, fitness_results):
@@ -123,7 +157,7 @@ class Population:
 
             # checking improvements
             improv_diff = best.fitness - self._past_best_fitness
-            improv_min_pc = CONFIG.maex_improvement_threshold_pc
+            improv_min_pc = self._config.maex_improvement_threshold_pc
             if improv_diff >= abs(self._past_best_fitness * improv_min_pc):
                 self._mass_extinction_counter = 0
                 self._past_best_fitness = best.fitness
@@ -131,12 +165,12 @@ class Population:
                 self._mass_extinction_counter += 1
             
             # TODO: do this
-            # CONFIG.update_mass_extinction(self._mass_extinction_counter)
+            self._config.update_mass_extinction(self._mass_extinction_counter)
 
 
             # checking mass extinction
             if (self._mass_extinction_counter
-                    >= CONFIG.mass_extinction_threshold):
+                    >= self._config.mass_extinction_threshold):
 
                 # mass extinction
                 self._mass_extinction_counter = 0
@@ -167,11 +201,11 @@ class Population:
                             reverse=True)
 
             # preserving the most fit individual
-            if len(sp.members) >= CONFIG.species_elitism_threshold:
+            if len(sp.members) >= self._config.species_elitism_threshold:
                 new_pop.append(sp.members[0])
 
             # removing the least fit individuals
-            r = int(len(sp.members) * CONFIG.weak_genomes_removal_pc)
+            r = int(len(sp.members) * self._config.weak_genomes_removal_pc)
             if 0 < r < len(sp.members):
                 r = len(sp.members) - r
                 for g in sp.members[r:]:
@@ -205,7 +239,7 @@ class Population:
         self.genomes = new_pop
 
         # # checking if the innovation ids should be reset
-        # reset_period = CONFIG.reset_innovations_period
+        # reset_period = self._config.reset_innovations_period
         # reset_counter = self._id_handler.reset_counter
         # if reset_period is not None and reset_counter > reset_period:
         #     self._id_handler.reset()
@@ -280,10 +314,10 @@ class Population:
         g1: Genome = np.random.choice(species.members, p=rank_prob_dist) # type: ignore
 
         # mating / cross-over
-        if utils.chance(CONFIG.mating_chance):
+        if utils.chance(self._config.mating_chance):
             # interspecific
             if (len(self.species) > 1
-                    and utils.chance(CONFIG.interspecies_mating_chance)):
+                    and utils.chance(self._config.interspecies_mating_chance)):
                 g2 = np.random.choice([g for g in self.genomes
                                        if g.species_id != species.id]) # type: ignore
             # intraspecific
@@ -295,25 +329,25 @@ class Population:
             baby = g1.clone()
 
         # enable connection mutation
-        if utils.chance(CONFIG.enable_connection_mutation_chance[0]):
+        if utils.chance(self._config.enable_connection_mutation_chance[0]):
             baby.enable_random_connection()
 
         # weight mutation
-        if utils.chance(CONFIG.weight_mutation_chance[0]):
+        if utils.chance(self._config.weight_mutation_chance[0]):
             baby.mutate_random_weight()
 
         # new connection mutation
-        if utils.chance(CONFIG.new_connection_mutation_chance[0]):
+        if utils.chance(self._config.new_connection_mutation_chance[0]):
             baby.add_random_connection(self._id_handler)
 
         # new node mutation
-        if utils.chance(CONFIG.new_node_mutation_chance[0]):
+        if utils.chance(self._config.new_node_mutation_chance[0]):
             baby.add_random_hidden_node(self._id_handler)
 
         # checking genome validity
-        valid_out = (not CONFIG.infanticide_output_nodes
+        valid_out = (not self._config.infanticide_output_nodes
                      or baby.valid_out_nodes())
-        valid_in = (not CONFIG.infanticide_input_nodes
+        valid_in = (not self._config.infanticide_input_nodes
                     or baby.valid_in_nodes())
 
         # genome is valid
@@ -359,7 +393,7 @@ class Population:
         Args:
             generation (int): Current generation number.
         """
-        extinction_threshold = CONFIG.species_no_improvement_limit
+        extinction_threshold = self._config.species_no_improvement_limit
 
         # checking improvements and resetting members
         removed_sids = []
@@ -384,7 +418,7 @@ class Population:
             self.species.pop(sid)
 
         # assigning genomes to species
-        dist_threshold = CONFIG.species_distance_threshold
+        dist_threshold = self._config.species_distance_threshold
         for genome in self.genomes:
             chosen_species = None
 
@@ -441,14 +475,14 @@ class Population:
 
         # adding hidden nodes
         max_hnodes = (self.__max_hidden_nodes
-                      + CONFIG.random_genome_bonus_nodes)
+                      + self._config.random_genome_bonus_nodes)
         if max_hnodes > 0:
             for _ in range(np.random.randint(low=0, high=(max_hnodes + 1))):
                 new_genome.add_random_hidden_node(self._id_handler)
 
         # adding random connections
         max_hcons = (self.__max_hidden_connections
-                     + CONFIG.random_genome_bonus_connections)
+                     + self._config.random_genome_bonus_connections)
         if max_hcons > 0:
             for _ in range(np.random.randint(low=0, high=(max_hcons + 1))):
                 new_genome.add_random_connection(self._id_handler)
