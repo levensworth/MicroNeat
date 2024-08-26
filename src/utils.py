@@ -1,8 +1,11 @@
+import typing
 import numpy as np
+
+_T = typing.TypeVar("_T")
 
 
 def chance(p: float) -> bool:
-    """ Randomly returns `True` or `False`.
+    """Randomly returns `True` or `False`.
 
     Args:
         p (float): Float between 0 and 1. Specifies the chance of the function
@@ -14,10 +17,12 @@ def chance(p: float) -> bool:
     return np.random.uniform(low=0, high=1) < p
 
 
-def rank_prob_dist(size: int,
-                   coefficient: float,
-                   min_prob: float = 1e-9) -> np.ndarray:
-    """ Calculates a probability distribution that associates a probability to
+def select_choice(elements: list[_T], **kwargs: typing.Any) -> _T:
+    return np.random.choice(elements, **kwargs)  # type: ignore
+
+
+def rank_prob_dist(size: int, coefficient: float, min_prob: float = 1e-9) -> np.ndarray:
+    """Calculates a probability distribution that associates a probability to
     each position of a rank with the given size.
 
     Args:

@@ -18,6 +18,7 @@ pydantic = "^2.8.2"
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.11.1"
 types-tqdm = "^4.66.0.20240417"
+ruff = "^0.6.2"
 
 [build-system]
 requires = ["poetry-core"]

@@ -8,55 +8,54 @@ MASS_EXTINCTION_MODIFIERS = {
     "new_connection_mutation_chance",
     "enable_connection_mutation_chance",
     "weight_perturbation_pc",
-    "weight_reset_chance"
+    "weight_reset_chance",
 }
 
+
 class NeatConfig(pydantic.BaseModel):
-    
     bias_value: int = 1
     with_bias: bool = True
     # reproduction
-    weak_genomes_removal_pc: float =0.75
-    weight_mutation_chance: tuple[float, float] =(0.7, 0.9)
-    new_node_mutation_chance: tuple[float, float] =(0.03, 0.3)
-    new_connection_mutation_chance: tuple[float, float] =(0.03, 0.3)
-    enable_connection_mutation_chance: tuple[float, float] =(0.03, 0.3)
-    disable_inherited_connection_chance: float =0.75
-    mating_chance: float =0.7
-    interspecies_mating_chance: float =0.05
-    rank_prob_dist_coefficient: float =1.75
+    weak_genomes_removal_pc: float = 0.75
+    weight_mutation_chance: tuple[float, float] = (0.7, 0.9)
+    new_node_mutation_chance: tuple[float, float] = (0.03, 0.3)
+    new_connection_mutation_chance: tuple[float, float] = (0.03, 0.3)
+    enable_connection_mutation_chance: tuple[float, float] = (0.03, 0.3)
+    disable_inherited_connection_chance: float = 0.75
+    mating_chance: float = 0.7
+    interspecies_mating_chance: float = 0.05
+    rank_prob_dist_coefficient: float = 1.75
     # weight mutation specifics
-    weight_perturbation_pc: tuple[float, float] =(0.1, 0.4)
-    weight_reset_chance: tuple[float, float] =(0.1, 0.3)
-    new_weight_interval: tuple[float, float] =(-2, 2)
+    weight_perturbation_pc: tuple[float, float] = (0.1, 0.4)
+    weight_reset_chance: tuple[float, float] = (0.1, 0.3)
+    new_weight_interval: tuple[float, float] = (-2, 2)
     # mass extinction
-    mass_extinction_threshold: int =15
-    maex_improvement_threshold_pc: float =0.03
+    mass_extinction_threshold: int = 15
+    maex_improvement_threshold_pc: float = 0.03
     # infanticide
-    infanticide_output_nodes: bool =True
-    infanticide_input_nodes: bool =True
+    infanticide_output_nodes: bool = True
+    infanticide_input_nodes: bool = True
     # random genomes
     random_genome_bonus_nodes: int = -2
     random_genome_bonus_connections: int = -2
     # genome distance coefficients
-    excess_genes_coefficient: float =1
-    disjoint_genes_coefficient: float =1
-    weight_difference_coefficient: float =0.5
+    excess_genes_coefficient: float = 1
+    disjoint_genes_coefficient: float = 1
+    weight_difference_coefficient: float = 0.5
     # speciation
-    species_distance_threshold: float =1
-    species_elitism_threshold: float =5
-    species_no_improvement_limit: float =15
+    species_distance_threshold: float = 1
+    species_elitism_threshold: float = 5
+    species_no_improvement_limit: float = 15
     # others
     reset_innovations_period: int = 5
-    allow_self_connections: bool =True
-    initial_node_activation: int =0
+    allow_self_connections: bool = True
+    initial_node_activation: int = 0
 
     _maex_cache: dict[str, float] = pydantic.PrivateAttr(default_factory=dict)
-    _maex_counter: int  = pydantic.PrivateAttr(default=0)
-
+    _maex_counter: int = pydantic.PrivateAttr(default=0)
 
     def update_coefficients_for_extinction_counter(self, maex_counter: int) -> None:
-        """ Updates the mutation chances based on the current value of the mass
+        """Updates the mutation chances based on the current value of the mass
         extinction counter (generations without improvement).
 
         Args:
@@ -67,4 +66,4 @@ class NeatConfig(pydantic.BaseModel):
         for k in MASS_EXTINCTION_MODIFIERS:
             base_value, max_value = getattr(self, k)
             unit = (max_value - base_value) / self.mass_extinction_threshold
-            self._maex_cache[k] = (base_value + unit * maex_counter)
+            self._maex_cache[k] = base_value + unit * maex_counter
