@@ -18,7 +18,7 @@ def make_env():
 
 if __name__ == '__main__':
     fitness_function = GymFitnessFunction(make_env=make_env, default_num_episodes=5, default_max_steps=500)
-    population = Population(size=100, n_inputs=4, n_outputs=2, with_bias=True)
+    population = Population(size=100, n_inputs=4, n_outputs=2,with_bias=True)
     
     population.evolve(
         generations=5,

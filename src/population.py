@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 import typing
 from src import utils
+from src.config import NeatConfig
 from src.genes import NodeGene
 from src.genome import Genome
 from src.id_handler import IDHandler
@@ -10,84 +11,90 @@ from src.species import NeatSpecies
 
 
 
-@dataclass
-class CONFIG:
-    bias_value=1
-    # reproduction
-    weak_genomes_removal_pc=0.75
-    weight_mutation_chance=(0.7, 0.9)
-    new_node_mutation_chance=(0.03, 0.3)
-    new_connection_mutation_chance=(0.03, 0.3)
-    enable_connection_mutation_chance=(0.03, 0.3)
-    disable_inherited_connection_chance=0.75
-    mating_chance=0.7
-    interspecies_mating_chance=0.05
-    rank_prob_dist_coefficient=1.75
-    # weight mutation specifics
-    weight_perturbation_pc=(0.1, 0.4)
-    weight_reset_chance=(0.1, 0.3)
-    new_weight_interval=(-2, 2)
-    # mass extinction
-    mass_extinction_threshold=15
-    maex_improvement_threshold_pc=0.03
-    # infanticide
-    infanticide_output_nodes=True
-    infanticide_input_nodes=True
-    # random genomes
-    random_genome_bonus_nodes=-2
-    random_genome_bonus_connections=-2
-    # genome distance coefficients
-    excess_genes_coefficient=1
-    disjoint_genes_coefficient=1
-    weight_difference_coefficient=0.5
-    # speciation
-    species_distance_threshold=1
-    species_elitism_threshold=5
-    species_no_improvement_limit=15
-    # others
-    reset_innovations_period=5
-    allow_self_connections=True
-    initial_node_activation=0
+# @dataclass
+# class CONFIG:
+#     bias_value=1
+#     # reproduction
+#     weak_genomes_removal_pc=0.75
+#     weight_mutation_chance=(0.7, 0.9)
+#     new_node_mutation_chance=(0.03, 0.3)
+#     new_connection_mutation_chance=(0.03, 0.3)
+#     enable_connection_mutation_chance=(0.03, 0.3)
+#     disable_inherited_connection_chance=0.75
+#     mating_chance=0.7
+#     interspecies_mating_chance=0.05
+#     rank_prob_dist_coefficient=1.75
+#     # weight mutation specifics
+#     weight_perturbation_pc=(0.1, 0.4)
+#     weight_reset_chance=(0.1, 0.3)
+#     new_weight_interval=(-2, 2)
+#     # mass extinction
+#     mass_extinction_threshold=15
+#     maex_improvement_threshold_pc=0.03
+#     # infanticide
+#     infanticide_output_nodes=True
+#     infanticide_input_nodes=True
+#     # random genomes
+#     random_genome_bonus_nodes=-2
+#     random_genome_bonus_connections=-2
+#     # genome distance coefficients
+#     excess_genes_coefficient=1
+#     disjoint_genes_coefficient=1
+#     weight_difference_coefficient=0.5
+#     # speciation
+#     species_distance_threshold=1
+#     species_elitism_threshold=5
+#     species_no_improvement_limit=15
+#     # others
+#     reset_innovations_period=5
+#     allow_self_connections=True
+#     initial_node_activation=0
 
-    _maex_cache: dict[str, float] = field(default_factory=dict)
-    _maex_counter = 0
+#     _maex_cache: dict[str, float] = field(default_factory=dict)
+#     _maex_counter = 0
 
-    #: Name of the attributes whose values change according to the mass
-    #:  extinction counter (type: Tuple[float, float]).
-    MAEX_KEYS = {"weight_mutation_chance",
-                 "new_node_mutation_chance",
-                 "new_connection_mutation_chance",
-                 "enable_connection_mutation_chance",
-                 "weight_perturbation_pc",
-                 "weight_reset_chance"}
+#     #: Name of the attributes whose values change according to the mass
+#     #:  extinction counter (type: Tuple[float, float]).
+#     MAEX_KEYS = {"weight_mutation_chance",
+#                  "new_node_mutation_chance",
+#                  "new_connection_mutation_chance",
+#                  "enable_connection_mutation_chance",
+#                  "weight_perturbation_pc",
+#                  "weight_reset_chance"}
 
-    def update_mass_extinction(self, maex_counter: int) -> None:
-        """ Updates the mutation chances based on the current value of the mass
-        extinction counter (generations without improvement).
+#     def update_mass_extinction(self, maex_counter: int) -> None:
+#         """ Updates the mutation chances based on the current value of the mass
+#         extinction counter (generations without improvement).
 
-        Args:
-            maex_counter (int): Current value of the mass extinction counter
-                (generations without improvement).
-        """
-        self._maex_counter = maex_counter
-        for k in type(self).MAEX_KEYS:
-            base_value, max_value = getattr(self, k)
-            unit = (max_value - base_value) / self.mass_extinction_threshold
-            self._maex_cache[k] = (base_value + unit * maex_counter)
+#         Args:
+#             maex_counter (int): Current value of the mass extinction counter
+#                 (generations without improvement).
+#         """
+#         self._maex_counter = maex_counter
+#         for k in type(self).MAEX_KEYS:
+#             base_value, max_value = getattr(self, k)
+#             unit = (max_value - base_value) / self.mass_extinction_threshold
+#             self._maex_cache[k] = (base_value + unit * maex_counter)
 
 
 class Population:
+    _DEFAULT_CONFIG = NeatConfig
     
-    def __init__(self, size: int, n_inputs: int, n_outputs: int, with_bias: bool = False) -> None:
+    def __init__(self, size: int, n_inputs: int, n_outputs: int, with_bias: bool = False, config: NeatConfig | None = None) -> None:
+        # Set the size of the population
         self._size = size
-
-        self._config = CONFIG()
+        # set the configuration
+        if config:
+            self._config = config
+        else:
+            self._config = self._DEFAULT_CONFIG()
 
 
         self._base_genome = Genome.from_inputs_and_outputs(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
-            with_bias=with_bias
+            with_bias=with_bias,
+            config=self._config
         )
 
         self._id_handler = IDHandler(
@@ -164,8 +171,8 @@ class Population:
             else:
                 self._mass_extinction_counter += 1
             
-            # TODO: do this
-            self._config.update_mass_extinction(self._mass_extinction_counter)
+            
+            self._config.update_coefficients_for_extinction_counter(self._mass_extinction_counter)
 
 
             # checking mass extinction

@@ -3,6 +3,7 @@ from copy import copy
 from dataclasses import dataclass
 import numpy as np
 from src import utils
+from src.config import NeatConfig
 from src.genes import ConnectionGene, NodeGene, align_connections
 from src.id_handler import IDHandler
 from src.nn import NeuralNetwork
@@ -76,7 +77,7 @@ class CONFIG:
 
 
 class Genome:
-    def __init__(self, input_nodes: list[NodeGene], output_nodes: list[NodeGene], hidden_nodes: list[NodeGene], connections: list[ConnectionGene], bias_node: NodeGene | None = None) -> None:
+    def __init__(self, input_nodes: list[NodeGene], output_nodes: list[NodeGene], hidden_nodes: list[NodeGene], connections: list[ConnectionGene], config: NeatConfig, bias_node: NodeGene | None = None) -> None:
         self.species_id: int | None = None
 
         self.fitness = 0.0
@@ -87,6 +88,8 @@ class Genome:
         self.output_nodes: list[NodeGene] = output_nodes
         self.bias_node = bias_node
         self.connections: list[ConnectionGene] = connections
+
+        self._config = config
     
     @classmethod
     def _create_input_nodes(cls, n_inputs: int) -> list[NodeGene]:
@@ -135,13 +138,13 @@ class Genome:
         return connections
 
     @classmethod
-    def from_inputs_and_outputs(cls, n_inputs: int, n_outputs: int, with_bias: bool = False) -> "Genome":
+    def from_inputs_and_outputs(cls, n_inputs: int, n_outputs: int, config: NeatConfig, with_bias: bool = False) -> "Genome":
         input_nodes: list[NodeGene] = cls._create_input_nodes(n_inputs)
         if with_bias:
             bias = NodeGene(
              node_id=len(input_nodes),
              node_type=NodeGene.NodeTypeEnum.BIAS,
-             activation_func=linear_activation,   
+             activation_func=linear_activation,
             )
         else:
             bias = None
@@ -158,11 +161,12 @@ class Genome:
             output_nodes,
             hidden_nodes,
             connections,
-            bias_node=bias
+            config=config,
+            bias_node=bias,
         )
 
     @classmethod
-    def from_connections(cls, connections: list[ConnectionGene]) -> "Genome":
+    def from_connections(cls, connections: list[ConnectionGene], config: NeatConfig) -> "Genome":
         input_nodes_dict: dict[int, NodeGene] = {}
         hidden_nodes_dict: dict[int, NodeGene] = {}
         output_nodes_dict: dict[int, NodeGene] = {}
@@ -208,6 +212,7 @@ class Genome:
             output_nodes=list(output_nodes_dict.values()),
             hidden_nodes=list(hidden_nodes_dict.values()),
             connections=new_connections,
+            config=config,
             bias_node=bias_node
         )
                     
@@ -265,7 +270,7 @@ class Genome:
                 copied_connection.is_enabled = enabled
                 chosen_connections.append(copied_connection)
         
-        return self.from_connections(chosen_connections)
+        return self.from_connections(chosen_connections, config=self._config)
     
 
     def mutate_random_weight(self) -> None:
@@ -387,6 +392,7 @@ class Genome:
             hidden_nodes=hidden_nodes,
             output_nodes=output_nodes,
             bias_node=bias_node,
+            config=self._config,
             connections=self.copy_connections(self.connections,new_nodes=new_nodes ,with_random_weights=True),
             
         )
@@ -405,6 +411,7 @@ class Genome:
             hidden_nodes=hidden_nodes,
             output_nodes=output_nodes,
             bias_node=bias_node,
+            config=self._config,
             connections=self.copy_connections(self.connections, new_nodes=new_nodes, with_random_weights=False),
         )
 

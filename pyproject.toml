@@ -11,11 +11,13 @@ flappy-bird-env = "^0.1.6"
 flappy-bird-gymnasium = "^0.4.0"
 plotly = "^5.23.0"
 tqdm = "^4.66.5"
+pydantic = "^2.8.2"
 
 
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.11.1"
+types-tqdm = "^4.66.0.20240417"
 
 [build-system]
 requires = ["poetry-core"]

@@ -40,7 +40,7 @@ class NodeGene:
         new_node = NodeGene(
             node_id=self.get_id(),
             node_type=self._type,
-            activation_func=self._activation_func
+            activation_func=self._activation_func,
         )
 
         return new_node
