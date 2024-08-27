@@ -6,6 +6,7 @@ from src.config import NeatConfig
 from src.genes import NodeGene
 from src.genome import Genome
 from src.id_handler import IDHandler
+from src.schedulers.pool_scheduler import PoolProcessingScheduler
 from src.species import NeatSpecies
 
 
@@ -57,6 +58,12 @@ class Population:
         new_sp.set_random_representative()
         self.species = {new_sp.id: new_sp}
 
+        self._scheduler = PoolProcessingScheduler(
+            num_processes=5,
+        )
+
+        self.record_holder = self._base_genome
+
     def evolve(
         self,
         generations: int,
@@ -71,8 +78,10 @@ class Population:
         for generation_num in range(generations):
             # calculating fitness
             fitness_results = []
-            for gen in tqdm(self.genomes):
-                fitness_results.append(fitness_function(gen))
+            # for gen in tqdm(self.genomes):
+            #     fitness_results.append(fitness_function(gen))
+
+            fitness_results = self._scheduler.run(self.genomes, func=fitness_function)
 
             # assigning fitness and adjusted fitness
             for genome, fitness in zip(self.genomes, fitness_results):
@@ -81,7 +90,14 @@ class Population:
                 sp = self.species[genome.species_id]
                 genome.adj_fitness = genome.fitness / len(sp.members)
             best = self.fittest()
-            print(f"Best result of gen {generation_num} was {max(fitness_results)}")
+            print(
+                f"Best result of gen {generation_num} was {max(fitness_results)} => {repr(best)}"
+            )
+            self.record_holder = (
+                best
+                if best.fitness > self.record_holder.fitness
+                else self.record_holder
+            )
 
             # counting max number of hidden nodes in one genome
             self.__max_hidden_nodes = np.max(
@@ -262,7 +278,7 @@ class Population:
             A newly generated genome.
         """
 
-        g1: Genome = utils.select_choice(species.members, p=rank_prob_dist)  # type: ignore
+        g1: Genome = utils.select_choice(species.members, p=rank_prob_dist)
 
         # mating / cross-over
         if utils.chance(self._config.mating_chance):
@@ -272,7 +288,7 @@ class Population:
             ):
                 g2 = utils.select_choice(
                     [g for g in self.genomes if g.species_id != species.id]
-                )  # type: ignore
+                )
             # intraspecific
             else:
                 g2: Genome = utils.select_choice(species.members)  # type: ignore
@@ -282,19 +298,19 @@ class Population:
             baby = g1.clone()
 
         # enable connection mutation
-        if utils.chance(self._config.enable_connection_mutation_chance[0]):
+        if utils.chance(self._config._maex_cache["enable_connection_mutation_chance"]):
             baby.enable_random_connection()
 
         # weight mutation
-        if utils.chance(self._config.weight_mutation_chance[0]):
+        if utils.chance(self._config._maex_cache["weight_mutation_chance"]):
             baby.mutate_random_weight()
 
         # new connection mutation
-        if utils.chance(self._config.new_connection_mutation_chance[0]):
+        if utils.chance(self._config._maex_cache["new_connection_mutation_chance"]):
             baby.add_random_connection(self._id_handler)
 
         # new node mutation
-        if utils.chance(self._config.new_node_mutation_chance[0]):
+        if utils.chance(self._config._maex_cache["new_node_mutation_chance"]):
             baby.add_random_hidden_node(self._id_handler)
 
         # checking genome validity

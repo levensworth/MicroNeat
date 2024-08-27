@@ -1,3 +1,5 @@
+import typing
+import numpy as np
 import pydantic
 
 #: Name of the attributes whose values change according to the mass
@@ -12,13 +14,38 @@ MASS_EXTINCTION_MODIFIERS = {
 }
 
 
+def linear_activation(x: float) -> float:
+    return x
+
+
+def sigmoid(x: float, clip_value: int = 64) -> float:
+    """Numeric stable implementation of the sigmoid function.
+
+    Estimated lower-bound precision with a clip value of 64: 10^(-28).
+    """
+    x = np.clip(x, -clip_value, clip_value)
+    return 1 / (1 + np.exp(-x))
+
+
+def bool_function(x: float) -> float:
+    if x > 0.5:
+        return 1
+    else:
+        return 0
+
+
+DEFAULT_ACTIVATION_FUNC = linear_activation
+
+
 class NeatConfig(pydantic.BaseModel):
+    out_nodes_activation: typing.Callable[[float], float] = sigmoid
+    hidden_nodes_activation: typing.Callable[[float], float] = sigmoid
     bias_value: int = 1
     with_bias: bool = True
     # reproduction
     weak_genomes_removal_pc: float = 0.75
     weight_mutation_chance: tuple[float, float] = (0.7, 0.9)
-    new_node_mutation_chance: tuple[float, float] = (0.03, 0.3)
+    new_node_mutation_chance: tuple[float, float] = (0.1, 0.3)
     new_connection_mutation_chance: tuple[float, float] = (0.03, 0.3)
     enable_connection_mutation_chance: tuple[float, float] = (0.03, 0.3)
     disable_inherited_connection_chance: float = 0.75
@@ -30,7 +57,7 @@ class NeatConfig(pydantic.BaseModel):
     weight_reset_chance: tuple[float, float] = (0.1, 0.3)
     new_weight_interval: tuple[float, float] = (-2, 2)
     # mass extinction
-    mass_extinction_threshold: int = 15
+    mass_extinction_threshold: int = 10
     maex_improvement_threshold_pc: float = 0.03
     # infanticide
     infanticide_output_nodes: bool = True

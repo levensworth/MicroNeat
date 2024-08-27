@@ -1,76 +1,52 @@
 from copy import copy
-from dataclasses import dataclass
 import numpy as np
 from src import utils
-from src.config import NeatConfig
+from src.config import DEFAULT_ACTIVATION_FUNC, NeatConfig
 from src.genes import ConnectionGene, NodeGene, align_connections
 from src.id_handler import IDHandler
 from src.nn import NeuralNetwork
 
 
-def linear_activation(x: float) -> float:
-    return x
-
-
-def sigmoid(x: float, clip_value: int = 64) -> float:
-    """Numeric stable implementation of the sigmoid function.
-
-    Estimated lower-bound precision with a clip value of 64: 10^(-28).
-    """
-    x = np.clip(x, -clip_value, clip_value)
-    return 1 / (1 + np.exp(-x))
-
-
-def bool_function(x: float) -> float:
-    if x > 0.5:
-        return 1
-    else:
-        return 0
-
-
-DEFAULT_ACTIVATION_FUNC = linear_activation
-
-
-@dataclass
-class CONFIG:
-    out_nodes_activation = sigmoid
-    hidden_nodes_activation = sigmoid
-    bias_value = 1
-    # reproduction
-    weak_genomes_removal_pc = 0.75
-    weight_mutation_chance = (0.7, 0.9)
-    new_node_mutation_chance = (0.03, 0.3)
-    new_connection_mutation_chance = (0.03, 0.3)
-    enable_connection_mutation_chance = (0.03, 0.3)
-    disable_inherited_connection_chance = 0.75
-    mating_chance = 0.7
-    interspecies_mating_chance = 0.1
-    rank_prob_dist_coefficient = 1.75
-    # weight mutation specifics
-    weight_perturbation_pc = (0.1, 0.4)
-    weight_reset_chance = 0.3
-    new_weight_interval = (-2, 2)
-    # mass extinction
-    mass_extinction_threshold = 15
-    maex_improvement_threshold_pc = 0.03
-    # infanticide
-    infanticide_output_nodes = True
-    infanticide_input_nodes = True
-    # random genomes
-    random_genome_bonus_nodes = -2
-    random_genome_bonus_connections = -2
-    # genome distance coefficients
-    excess_genes_coefficient = 1
-    disjoint_genes_coefficient = 1
-    weight_difference_coefficient = 0.5
-    # speciation
-    species_distance_threshold = 2
-    species_elitism_threshold = 5
-    species_no_improvement_limit = 15
-    # others
-    reset_innovations_period = 5
-    allow_self_connections = True
-    initial_node_activation = 0
+# @dataclass
+# class CONFIG:
+#     out_nodes_activation = sigmoid
+#     hidden_nodes_activation = sigmoid
+#     bias_value = 1
+#     # reproduction
+#     weak_genomes_removal_pc = 0.75
+#     weight_mutation_chance = (0.7, 0.9)
+#     new_node_mutation_chance = (0.03, 0.3)
+#     new_connection_mutation_chance = (0.03, 0.3)
+#     enable_connection_mutation_chance = (0.03, 0.3)
+#     disable_inherited_connection_chance = 0.75
+#     mating_chance = 0.7
+#     interspecies_mating_chance = 0.1
+#     rank_prob_dist_coefficient = 1.75
+#     # weight mutation specifics
+#     weight_perturbation_pc = (0.1, 0.4)
+#     weight_reset_chance = 0.3
+#     new_weight_interval = (-2, 2)
+#     # mass extinction
+#     mass_extinction_threshold = 15
+#     maex_improvement_threshold_pc = 0.03
+#     # infanticide
+#     infanticide_output_nodes = True
+#     infanticide_input_nodes = True
+#     # random genomes
+#     random_genome_bonus_nodes = -2
+#     random_genome_bonus_connections = -2
+#     # genome distance coefficients
+#     excess_genes_coefficient = 1
+#     disjoint_genes_coefficient = 1
+#     weight_difference_coefficient = 0.5
+#     # speciation
+#     species_distance_threshold = 2
+#     species_elitism_threshold = 5
+#     species_no_improvement_limit = 15
+#     # others
+#     reset_innovations_period = 5
+#     allow_self_connections = True
+#     initial_node_activation = 0
 
 
 class Genome:
@@ -96,8 +72,11 @@ class Genome:
 
         self._config = config
 
+    def __repr__(self) -> str:
+        return f"Genome(n_inputs = {len(self.input_nodes)} | n_hidden = {len(self.hidden_nodes)} | n_output = {len(self.output_nodes)} | n_cons = {len(self.connections)})"
+
     @classmethod
-    def _create_input_nodes(cls, n_inputs: int) -> list[NodeGene]:
+    def _create_input_nodes(cls, n_inputs: int, config: NeatConfig) -> list[NodeGene]:
         input_nodes: list[NodeGene] = []
         node_counter = 0
         for _ in range(n_inputs):
@@ -114,7 +93,11 @@ class Genome:
 
     @classmethod
     def _create_output_nodes(
-        cls, n_outputs: int, input_nodes: list[NodeGene], bias_node: NodeGene | None
+        cls,
+        n_outputs: int,
+        input_nodes: list[NodeGene],
+        bias_node: NodeGene | None,
+        config: NeatConfig,
     ) -> list[NodeGene]:
         node_counter = len(input_nodes)
         node_counter += 1 if bias_node is not None else 0
@@ -124,7 +107,7 @@ class Genome:
             output_node = NodeGene(
                 node_id=node_counter,
                 node_type=NodeGene.NodeTypeEnum.OUTPUT,
-                activation_func=CONFIG.out_nodes_activation,
+                activation_func=config.out_nodes_activation,
             )
             output_nodes.append(output_node)
             node_counter += 1
@@ -132,7 +115,10 @@ class Genome:
 
     @classmethod
     def _create_connections(
-        cls, input_nodes: list[NodeGene], output_nodes: list[NodeGene]
+        cls,
+        input_nodes: list[NodeGene],
+        output_nodes: list[NodeGene],
+        config: NeatConfig,
     ) -> list[ConnectionGene]:
         connection_counter = 0
         connections: list[ConnectionGene] = []
@@ -143,6 +129,7 @@ class Genome:
                     connection_id=connection_counter,
                     src_node=src_node,
                     dst_node=output_node,
+                    config=config,
                 )
                 connections.append(conn)
                 connection_counter += 1
@@ -152,24 +139,24 @@ class Genome:
     def from_inputs_and_outputs(
         cls, n_inputs: int, n_outputs: int, config: NeatConfig, with_bias: bool = False
     ) -> "Genome":
-        input_nodes: list[NodeGene] = cls._create_input_nodes(n_inputs)
+        input_nodes: list[NodeGene] = cls._create_input_nodes(n_inputs, config=config)
         if with_bias:
             bias = NodeGene(
                 node_id=len(input_nodes),
                 node_type=NodeGene.NodeTypeEnum.BIAS,
-                activation_func=linear_activation,
+                activation_func=DEFAULT_ACTIVATION_FUNC,
             )
         else:
             bias = None
 
         hidden_nodes: list[NodeGene] = []
         output_nodes: list[NodeGene] = cls._create_output_nodes(
-            n_outputs, input_nodes=input_nodes, bias_node=bias
+            n_outputs, input_nodes=input_nodes, bias_node=bias, config=config
         )
 
         connection_sources = input_nodes + ([bias] if bias is not None else [])
         connections: list[ConnectionGene] = cls._create_connections(
-            connection_sources, output_nodes
+            connection_sources, output_nodes, config=config
         )
 
         return Genome(
@@ -283,7 +270,7 @@ class Genome:
                     c2 is not None and not c2.is_enabled
                 ):
                     enabled = not utils.chance(
-                        CONFIG.disable_inherited_connection_chance
+                        self._config.disable_inherited_connection_chance
                     )
 
                 copied_connection = copy(
@@ -297,14 +284,14 @@ class Genome:
     def mutate_random_weight(self) -> None:
         for connection in self.connections:
             # TODO: check if maybe introduce more change
-            if utils.chance(CONFIG.weight_reset_chance):
+            if utils.chance(self._config._maex_cache["weight_reset_chance"]):
                 # perturbing the connection
-                connection.weight = np.random.uniform(*CONFIG.new_weight_interval)
+                connection.weight = np.random.uniform(*self._config.new_weight_interval)
             else:
                 # resetting the connection
                 p = np.random.uniform(
-                    low=-CONFIG.weight_perturbation_pc[0],
-                    high=CONFIG.weight_perturbation_pc[1],
+                    low=-self._config.weight_perturbation_pc[0],
+                    high=self._config.weight_perturbation_pc[1],
                 )
                 d = connection.weight * p
                 connection.weight += d
@@ -341,7 +328,7 @@ class Genome:
                         )
                         self.connections.append(
                             self._create_connection_with_random_weights(
-                                cid, src_node, dest_node
+                                cid, src_node, dest_node, config=self._config
                             )
                         )
                         return src_node, dest_node
@@ -401,9 +388,9 @@ class Genome:
                 num_matches += 1
                 weight_diff += abs(cn1.weight - cn2.weight)
 
-        c1 = CONFIG.excess_genes_coefficient
-        c2 = CONFIG.disjoint_genes_coefficient
-        c3 = CONFIG.weight_difference_coefficient
+        c1 = self._config.excess_genes_coefficient
+        c2 = self._config.disjoint_genes_coefficient
+        c3 = self._config.weight_difference_coefficient
 
         n = max(len(self.connections), len(other.connections))
         return ((c1 * excess + c2 * disjoint) / n) + c3 * weight_diff / num_matches
@@ -465,7 +452,7 @@ class Genome:
                 src_node_id=src_node.get_id(), dst_node_id=dst_node.get_id()
             ),
             node_type=NodeGene.NodeTypeEnum.HIDDEN,
-            activation_func=CONFIG.hidden_nodes_activation,
+            activation_func=self._config.hidden_nodes_activation,
         )
 
         self.hidden_nodes.append(new_node)
@@ -551,9 +538,13 @@ class Genome:
 
     @classmethod
     def _create_connection_with_random_weights(
-        cls, connection_id: int, src_node: NodeGene, dst_node: NodeGene
+        cls,
+        connection_id: int,
+        src_node: NodeGene,
+        dst_node: NodeGene,
+        config: NeatConfig,
     ) -> ConnectionGene:
-        weight = np.random.uniform(*CONFIG.new_weight_interval)
+        weight = np.random.uniform(*config.new_weight_interval)
         return cls._create_connection(
             connection_id, src_node, dst_node, weight, is_enabled=True
         )
@@ -612,6 +603,7 @@ class Genome:
                     connection_id=connection.get_id(),
                     src_node=nodes_lookup[connection.get_source_node().get_id()],
                     dst_node=nodes_lookup[connection.get_destination_node().get_id()],
+                    config=self._config,
                 )
             else:
                 new_conn = self._create_connection(

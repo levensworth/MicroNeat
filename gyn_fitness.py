@@ -141,6 +141,9 @@ class GymFitnessFunction:
 
         # Running the episodes:
         eps = None
+
+        distance = 0
+
         for eps in range(num_eps):
             # Callback: `on_episode_start`:
             # for cb in callbacks:
@@ -191,7 +194,7 @@ class GymFitnessFunction:
                             #                          f"{h.shape}!")
                             obs = obs[0]
 
-                        h = genome.apply(obs)
+                        h = genome.apply(obs.flatten())
 
                         # Determining the action:
                         if self._discrete_action_space:
@@ -215,11 +218,17 @@ class GymFitnessFunction:
                 # for cb in callbacks:
                 #     cb.on_action_chosen(wrapped_action=wrapped_action)
                 action = wrapped_action.value
+                
+                if int(action) in [2, 3]:
+                    distance += 1
+
+                if int(action) in [0]:
+                    distance -= 1
 
                 # Processing step:
                 obs, reward, env_done, info, _ = env.step(action)
-                total_reward += reward
 
+                total_reward += reward
                 # Callback: `on_step_taken`:
                 # for cb in callbacks:
                 #     cb.on_step_taken(obs=obs,
@@ -229,6 +238,7 @@ class GymFitnessFunction:
                 #                      total_reward=total_reward,
                 #                      force_stop_eps=force_stop_eps)
                 step += 1
+                
 
         # Callback: `on_env_close`:
         # for cb in callbacks:
@@ -243,3 +253,94 @@ class GymFitnessFunction:
 
         # Returning average fitness:
         return (total_reward / (eps + 1)) if eps is not None else 0
+    
+
+
+class SpaceInvadersFitness(GymFitnessFunction):
+    def __call__(self, genome: Genome, num_eps: int | None = None, max_steps: int | None = None, visualize: bool = False) -> float:
+        # Preparing variables:
+        total_reward = 0.0
+
+        if num_eps is None:
+            num_eps = self._default_num_episodes
+
+        if max_steps is None:
+            max_steps = (self._default_max_steps  # type: ignore
+                         if self._default_max_steps is not None
+                         else float("inf"))
+
+        # Building the environment:
+        env = self._make_env()
+        # Running the episodes:
+
+        distance = 0
+        last_action = None
+        
+        
+        # Resetting:
+        obs = env.reset()
+        
+        env_done = False
+        force_stop_eps = MutableWrapper(False)
+
+        # Running the steps:
+        step = 0
+        while (step <= max_steps
+                and not env_done
+                and not force_stop_eps.value):
+            
+
+            
+            # Callback: `on_obs_processing`:
+            wrapped_obs = MutableWrapper(obs)
+            # for cb in callbacks:
+            #     cb.on_obs_processing(wrapped_obs=wrapped_obs)
+            obs = wrapped_obs.value
+
+            # Feeding obs to genome:
+            if genome is not None:
+
+                
+                # Fixing the output's shape (if needed):
+                if isinstance(obs, tuple):
+                    # assert h.shape[0] == 1, ("Invalid output shape "
+                    #                          f"{h.shape}!")
+                    obs = obs[0]
+
+                h = genome.apply(obs.flatten())
+
+                # Determining the action:
+                if self._discrete_action_space:
+                    # Discrete action space
+                    action = (round(float(h[0])) if len(h) == 1
+                                else np.argmax(h))
+                else:
+                    # Boxed action space
+                    action = h
+
+            # Callback: `on_action_chosen`
+            wrapped_action = MutableWrapper(action)
+            # for cb in callbacks:
+            #     cb.on_action_chosen(wrapped_action=wrapped_action)
+            action = wrapped_action.value
+            
+            
+
+            # Processing step:
+            obs, reward, env_done, info, _ = env.step(action)
+
+            # don't be lazy
+            if int(action) == 0 and action == last_action:
+                total_reward -= 2
+
+            total_reward += reward
+            
+
+            step += 1
+            last_action = action
+
+        # Closing the environment:
+        env.close()
+
+        # Returning average fitness:
+        return total_reward + (float(distance) / 100 ) * 5
