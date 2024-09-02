@@ -78,10 +78,10 @@ class Population:
         for generation_num in range(generations):
             # calculating fitness
             fitness_results = []
-            # for gen in tqdm(self.genomes):
-            #     fitness_results.append(fitness_function(gen))
+            for gen in tqdm(self.genomes):
+                fitness_results.append(fitness_function(gen))
 
-            fitness_results = self._scheduler.run(self.genomes, func=fitness_function)
+            # fitness_results = self._scheduler.run(self.genomes, func=fitness_function)
 
             # assigning fitness and adjusted fitness
             for genome, fitness in zip(self.genomes, fitness_results):
@@ -90,9 +90,7 @@ class Population:
                 sp = self.species[genome.species_id]
                 genome.adj_fitness = genome.fitness / len(sp.members)
             best = self.fittest()
-            print(
-                f"Best result of gen {generation_num} was {max(fitness_results)} => {repr(best)}"
-            )
+
             self.record_holder = (
                 best
                 if best.fitness > self.record_holder.fitness
@@ -200,7 +198,7 @@ class Population:
             # generating offspring
             babies = [
                 self.generate_offspring(species=sp, rank_prob_dist=prob)  # type: ignore
-                for _ in range(offspring_count[sp.id])
+                for _ in range(offspring_count.get(sp.id, 0))
             ]
             new_pop += babies
 
