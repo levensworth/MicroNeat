@@ -1,0 +1,76 @@
+[tool.poetry]
+name = "neulabpy"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "~3.10"
+plotly = "^5.23.0"
+tqdm = "^4.66.5"
+pydantic = "^2.8.2"
+gymnasium = {extras = ["accept-rom-licesnse", "atari"], version = "^0.29.1"}
+autorom = {extras = ["accept-rom-license"], version = "^0.6.1"}
+
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.11.1"
+types-tqdm = "^4.66.0.20240417"
+ruff = "^0.6.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.mypy]
+# Include common directories
+files = ["src"]
+
+# Disallow dynamic typing by default (stricter checks)
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+# Report errors for missing imports
+ignore_missing_imports = false
+
+# Warn about unused "type: ignore" comments
+warn_unused_ignores = true
+
+# Check for untyped calls
+disallow_untyped_calls = true
+
+# Check for untyped decorator functions
+disallow_untyped_decorators = true
+
+# Ensure strict optional checking
+strict_optional = true
+
+# Type-check variable assignments
+disallow_untyped_globals = true
+
+# Warn about unreachable code
+warn_unreachable = true
+
+# Show the error code of each error message
+show_error_codes = true
+
+# Set the target Python version (e.g., 3.10)
+python_version = "3.10"
+
+# Report any non-local imports that don't use a relative path
+no_implicit_reexport = true
+
+# Do not allow any function to have both an argument without a default and a keyword-only argument after it
+allow_redefinition = false
+
+# Do not follow imports to .pyi type stubs (may be useful if the stub files are incomplete or inaccurate)
+# follow_imports = "silent"
+
+# Set the cache directory (optional)
+cache_dir = ".mypy_cache"
+
+# Exclude certain files or directories from type checking (e.g., migrations in Django projects)
+exclude = ["migrations", "docs", "build"]
