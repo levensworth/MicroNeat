@@ -1,10 +1,12 @@
 # import ale_py
 # if using gymnasium
 # import shimmy
+import pathlib
 import gymnasium as gym
 import numpy as np
 
 from gyn_fitness import GymFitnessFunction, SpaceInvadersFitness
+from src.genome import Genome
 from src.population import Population
 from src.visualization import visualize_genome
 
@@ -32,18 +34,21 @@ if __name__ == '__main__':
     population = Population(size=100, n_inputs=8, n_outputs=4,with_bias=True)
     
     population.evolve(
-        generations=50,
+        generations=20,
         fitness_function=fitness_function
     )
     best_model = population.record_holder
-    visualize_genome(best_model)
+    model_path = pathlib.Path('models/lunar_lander')
+    best_model.save(path=model_path)
+    model = Genome.load(model_path)
+    visualize_genome(model)
 
     env = gym.make("LunarLander-v2",render_mode='human')
     env.reset()
     action = env.action_space.sample()
     for _ in range(1000):
         observation, reward, terminated, truncated, info = env.step(action)
-        h = best_model.apply(observation)
+        h = model.apply(observation)
         action = (round(float(h[0])) if len(h) == 1
                                       else np.argmax(h))
         if terminated:
