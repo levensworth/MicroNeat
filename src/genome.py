@@ -1,52 +1,15 @@
 from copy import copy
+import io
+import pathlib
+import pickle
+import typing
 import numpy as np
 from src import utils
 from src.config import DEFAULT_ACTIVATION_FUNC, NeatConfig
 from src.genes import ConnectionGene, NodeGene, align_connections
 from src.id_handler import IDHandler
+from src.misc.serialization import pickle_load, pickle_save
 from src.nn import NeuralNetwork
-
-
-# @dataclass
-# class CONFIG:
-#     out_nodes_activation = sigmoid
-#     hidden_nodes_activation = sigmoid
-#     bias_value = 1
-#     # reproduction
-#     weak_genomes_removal_pc = 0.75
-#     weight_mutation_chance = (0.7, 0.9)
-#     new_node_mutation_chance = (0.03, 0.3)
-#     new_connection_mutation_chance = (0.03, 0.3)
-#     enable_connection_mutation_chance = (0.03, 0.3)
-#     disable_inherited_connection_chance = 0.75
-#     mating_chance = 0.7
-#     interspecies_mating_chance = 0.1
-#     rank_prob_dist_coefficient = 1.75
-#     # weight mutation specifics
-#     weight_perturbation_pc = (0.1, 0.4)
-#     weight_reset_chance = 0.3
-#     new_weight_interval = (-2, 2)
-#     # mass extinction
-#     mass_extinction_threshold = 15
-#     maex_improvement_threshold_pc = 0.03
-#     # infanticide
-#     infanticide_output_nodes = True
-#     infanticide_input_nodes = True
-#     # random genomes
-#     random_genome_bonus_nodes = -2
-#     random_genome_bonus_connections = -2
-#     # genome distance coefficients
-#     excess_genes_coefficient = 1
-#     disjoint_genes_coefficient = 1
-#     weight_difference_coefficient = 0.5
-#     # speciation
-#     species_distance_threshold = 2
-#     species_elitism_threshold = 5
-#     species_no_improvement_limit = 15
-#     # others
-#     reset_innovations_period = 5
-#     allow_self_connections = True
-#     initial_node_activation = 0
 
 
 class Genome:
@@ -638,3 +601,14 @@ class Genome:
 
     def get_node_connections_out(self, node: NodeGene) -> list[ConnectionGene]:
         return [con for con in self.connections if con.get_source_node() == node]
+
+    # serialization
+
+    def save(self, path: pathlib.Path) -> None:
+        pickle_save(self, path.absolute())
+
+    @classmethod
+    def load(cls: type["Genome"], path: pathlib.Path) -> "Genome":
+        obj = pickle_load(path.absolute())
+        assert isinstance(obj, cls), f'loaded object is not an instance of {cls.__name__}'
+        return obj
