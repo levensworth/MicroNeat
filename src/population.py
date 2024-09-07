@@ -6,6 +6,8 @@ from src.config import NeatConfig
 from src.genes import NodeGene
 from src.genome import Genome
 from src.id_handler import IDHandler
+from src.misc.callbacks.callback import Callback
+from src.misc.callbacks.history_callback import History
 from src.schedulers.pool_scheduler import PoolProcessingScheduler
 from src.species import NeatSpecies
 
@@ -68,7 +70,14 @@ class Population:
         self,
         generations: int,
         fitness_function: typing.Callable[[Genome], float],
-    ) -> None:
+        func: typing.Callable[[History], None],
+        callbacks: list[Callback] = []
+    ) -> History:
+        history_cb = History()
+        callbacks += [history_cb]
+        for cb in callbacks:
+            cb.set_population(self)
+
         self._last_improvement = 0
         self._past_best_fitness = float("-inf")
 
@@ -76,12 +85,21 @@ class Population:
         self.stop_evolving = False
         generation_num = 0
         for generation_num in range(generations):
-            # calculating fitness
-            fitness_results = []
-            for gen in tqdm(self.genomes):
-                fitness_results.append(fitness_function(gen))
+            func(history_cb)
+            # on generation start
+            for cb in callbacks:
+                cb.on_generation_start(current_generation=generation_num, max_generations=generations)
 
-            # fitness_results = self._scheduler.run(self.genomes, func=fitness_function)
+            # calculating fitness
+            # fitness_results = []
+            # for gen in tqdm(self.genomes):
+            #     fitness_results.append(fitness_function(gen))
+
+            fitness_results = self._scheduler.run_with_progress(
+                self.genomes, 
+                func=fitness_function,
+                progress_callback=lambda percentage: history_cb._current_generation_processing.update(history_cb._task_id, completed=percentage)
+            )
 
             # assigning fitness and adjusted fitness
             for genome, fitness in zip(self.genomes, fitness_results):
@@ -89,6 +107,7 @@ class Population:
                 assert genome.species_id is not None
                 sp = self.species[genome.species_id]
                 genome.adj_fitness = genome.fitness / len(sp.members)
+            
             best = self.fittest()
 
             self.record_holder = (
@@ -126,6 +145,14 @@ class Population:
 
             # callback: on_fitness_calculated
             avg_fitness = self.average_fitness()
+            for cb in callbacks:
+                cb.on_fitness_calculated(
+                    best_fitness=best.fitness,
+                    avg_fitness=avg_fitness,
+                    max_hidden_nodes=self.__max_hidden_nodes,
+                    max_hidden_connections=self.__max_hidden_connections,
+                    best_genome=best
+                )
 
             # checking improvements
             improv_diff = best.fitness - self._past_best_fitness
@@ -140,26 +167,60 @@ class Population:
                 self._mass_extinction_counter
             )
 
+            # callback: on_mass_extinction_counter_updated
+            for cb in callbacks:
+                cb.on_mass_extinction_counter_updated(
+                    self._mass_extinction_counter
+                )
+
             # checking mass extinction
             if self._mass_extinction_counter >= self._config.mass_extinction_threshold:
+
+                # callback: on_mass_extinction_start
+                for cb in callbacks:
+                    cb.on_mass_extinction_start()
+
                 # mass extinction
                 self._mass_extinction_counter = 0
                 self.genomes = [best] + [
                     self._random_genome_with_extras() for _ in range(self._size - 1)
                 ]
-                print("mass extinction")
+                
                 assert len(self.genomes) == self._size
             else:
                 # reproduction
+
+                # callback: on_reproduction_start
+                for cb in callbacks:
+                    cb.on_reproduction_start()
+
                 self.reproduction()
+
+            # callback: on_speciation_start
+            for cb in callbacks:
+                cb.on_speciation_start(
+                    invalid_genoems_replaced=self._invalid_genomes_replaced,
+                )
 
             # speciation
             self.speciation(generation=generation_num)
+
+            # callback: on_generation_end
+            for cb in callbacks:
+                cb.on_generation_end(generation_num, generations)
+
 
             # early stopping
             if self.stop_evolving:
                 break
 
+
+                # callback: on_evolution_end
+        for cb in callbacks:
+            cb.on_evolution_end(generation_num)
+
+        return history_cb
+    
     def reproduction(self) -> None:
         new_pop = []
 

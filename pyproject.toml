@@ -12,6 +12,7 @@ tqdm = "^4.66.5"
 pydantic = "^2.8.2"
 gymnasium = {extras = ["accept-rom-licesnse", "atari"], version = "^0.29.1"}
 autorom = {extras = ["accept-rom-license"], version = "^0.6.1"}
+rich = "^13.8.0"
 
 
 
