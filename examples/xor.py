@@ -4,28 +4,6 @@ from src.population import Population
 from src.visualization import visualize_genome
 
 
-# genome = Genome.from_inputs_and_outputs(n_inputs=3, n_outputs=10)
-# visualize_genome(genome)
-# new_genome = genome.copy_with_random_weights()
-# visualize_genome(new_genome)
-
-# # plot_dag(genome.get_nodes())
-
-# id_handler = IDHandler(num_inputs=3, num_outputs=10, has_bias=False)
-# visualize_genome(genome)
-# genome.add_random_hidden_node(id_handler)
-# visualize_genome(genome)
-
-# new_genome = genome.copy_with_random_weights()
-
-
-# new_genome.add_random_connection(id_handler)
-# visualize_genome(new_genome)
-# print('here')
-
-# child = genome.mate(new_genome)
-# visualize_genome(child)
-
 N_INPUTS = 3
 
 def make_xor_data(num_variables: int = 2) -> tuple[np.ndarray, np.ndarray]:
@@ -123,20 +101,3 @@ for inp in xor_inputs:
 visualize_genome(population.fittest())
 
 print(population.fittest().get_nodes())
-
-# genome = Genome.from_inputs_and_outputs(2, 1)
-# for _ in range(10):
-#     genome.add_random_hidden_node(id_handler)
-#     genome.add_random_connection(id_handler)
-
-# total_con = 0
-# for node in genome.get_nodes():
-#     total_con += len(node.get_connections_in())
-
-# print(total_con)
-# print(len(genome.connections))
-
-
-# visualize_genome(genome)
-# result = genome.apply([1,0])
-# print(result)

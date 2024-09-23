@@ -610,5 +610,7 @@ class Genome:
     @classmethod
     def load(cls: type["Genome"], path: pathlib.Path) -> "Genome":
         obj = pickle_load(path.absolute())
-        assert isinstance(obj, cls), f'loaded object is not an instance of {cls.__name__}'
+        assert isinstance(
+            obj, cls
+        ), f"loaded object is not an instance of {cls.__name__}"
         return obj

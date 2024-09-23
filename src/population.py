@@ -71,7 +71,7 @@ class Population:
         generations: int,
         fitness_function: typing.Callable[[Genome], float],
         func: typing.Callable[[History], None],
-        callbacks: list[Callback] = []
+        callbacks: list[Callback] = [],
     ) -> History:
         history_cb = History()
         callbacks += [history_cb]
@@ -88,7 +88,9 @@ class Population:
             func(history_cb)
             # on generation start
             for cb in callbacks:
-                cb.on_generation_start(current_generation=generation_num, max_generations=generations)
+                cb.on_generation_start(
+                    current_generation=generation_num, max_generations=generations
+                )
 
             # calculating fitness
             # fitness_results = []
@@ -96,9 +98,11 @@ class Population:
             #     fitness_results.append(fitness_function(gen))
 
             fitness_results = self._scheduler.run_with_progress(
-                self.genomes, 
+                self.genomes,
                 func=fitness_function,
-                progress_callback=lambda percentage: history_cb._current_generation_processing.update(history_cb._task_id, completed=percentage)
+                progress_callback=lambda percentage: history_cb._current_generation_processing.update(
+                    history_cb._task_id, completed=percentage
+                ),
             )
 
             # assigning fitness and adjusted fitness
@@ -107,7 +111,7 @@ class Population:
                 assert genome.species_id is not None
                 sp = self.species[genome.species_id]
                 genome.adj_fitness = genome.fitness / len(sp.members)
-            
+
             best = self.fittest()
 
             self.record_holder = (
@@ -151,7 +155,7 @@ class Population:
                     avg_fitness=avg_fitness,
                     max_hidden_nodes=self.__max_hidden_nodes,
                     max_hidden_connections=self.__max_hidden_connections,
-                    best_genome=best
+                    best_genome=best,
                 )
 
             # checking improvements
@@ -169,13 +173,10 @@ class Population:
 
             # callback: on_mass_extinction_counter_updated
             for cb in callbacks:
-                cb.on_mass_extinction_counter_updated(
-                    self._mass_extinction_counter
-                )
+                cb.on_mass_extinction_counter_updated(self._mass_extinction_counter)
 
             # checking mass extinction
             if self._mass_extinction_counter >= self._config.mass_extinction_threshold:
-
                 # callback: on_mass_extinction_start
                 for cb in callbacks:
                     cb.on_mass_extinction_start()
@@ -185,7 +186,7 @@ class Population:
                 self.genomes = [best] + [
                     self._random_genome_with_extras() for _ in range(self._size - 1)
                 ]
-                
+
                 assert len(self.genomes) == self._size
             else:
                 # reproduction
@@ -209,18 +210,16 @@ class Population:
             for cb in callbacks:
                 cb.on_generation_end(generation_num, generations)
 
-
             # early stopping
             if self.stop_evolving:
                 break
-
 
                 # callback: on_evolution_end
         for cb in callbacks:
             cb.on_evolution_end(generation_num)
 
         return history_cb
-    
+
     def reproduction(self) -> None:
         new_pop = []
 

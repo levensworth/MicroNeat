@@ -11,10 +11,9 @@ from typing import Callable, List, Optional, Sequence
 import typing
 
 
-
 class ProgressCounter(object):
     def __init__(self) -> None:
-        self.val = multiprocessing.Value('i', 0)
+        self.val = multiprocessing.Value("i", 0)
 
     def increment(self, n: int = 1) -> None:
         with self.val.get_lock():
@@ -26,6 +25,7 @@ class ProgressCounter(object):
 
 
 PROGRESS_COUNTER = ProgressCounter()
+
 
 class PoolProcessingScheduler:
     """Processing scheduler that uses Python's
@@ -95,9 +95,12 @@ class PoolProcessingScheduler:
             passed as argument.
         """
         return self._pool.map(func, items, chunksize=self._chunksize)
-    
+
     def run_with_progress(
-        self, items: Sequence[typing.Any], func: Callable[[typing.Any], typing.Any], progress_callback: Callable[[int], typing.Any]
+        self,
+        items: Sequence[typing.Any],
+        func: Callable[[typing.Any], typing.Any],
+        progress_callback: Callable[[int], typing.Any],
     ) -> List[typing.Any]:
         """Processes the given items and returns a result.
 
@@ -125,8 +128,8 @@ class PoolProcessingScheduler:
         """
 
         result = []
-        with  multiprocessing.Pool(processes=self._num_processes) as pool:
-            result_iterator =  pool.imap(func, items, chunksize=self._chunksize)
+        with multiprocessing.Pool(processes=self._num_processes) as pool:
+            result_iterator = pool.imap(func, items, chunksize=self._chunksize)
             for item in result_iterator:
                 result.append(item)
                 progress_rate = (len(result) * 100) // len(items)

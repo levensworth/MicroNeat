@@ -1,11 +1,13 @@
+import pathlib
 import ale_py
 # if using gymnasium
 import shimmy
 import gymnasium as gym
 import numpy as np
 
-from gyn_fitness import GymFitnessFunction, SpaceInvadersFitness
+from gyn_fitness import SpaceInvadersFitness
 from src.population import Population
+from src.terminal import EvolutionVisualizer
 from src.visualization import visualize_genome
 
 
@@ -26,12 +28,16 @@ if __name__ == '__main__':
     fitness_function = SpaceInvadersFitness(make_env=make_car_env, default_num_episodes=1, default_max_steps=1000)
     population = Population(size=10, n_inputs=128, n_outputs=6,with_bias=True)
     
-    population.evolve(
+    viz = EvolutionVisualizer(population=population)
+
+    viz.run(
         generations=70,
         fitness_function=fitness_function
     )
+    
     best_model = population.record_holder
     visualize_genome(best_model)
+    best_model.save(pathlib.Path('space-invaders-best.pkl'))
 
     env = gym.make("SpaceInvaders-ram-v4",render_mode='human')
     env.reset()

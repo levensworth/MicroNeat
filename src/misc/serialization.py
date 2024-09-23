@@ -4,7 +4,7 @@ import typing
 
 
 def pickle_save(obj: typing.Any, abs_path: str | pathlib.Path) -> None:
-    """ Saves the given object to the given absolute path.
+    """Saves the given object to the given absolute path.
 
     Simple wrapper around the `pickle` package.
 
@@ -24,7 +24,7 @@ def pickle_save(obj: typing.Any, abs_path: str | pathlib.Path) -> None:
 
 
 def pickle_load(abs_path: str | pathlib.Path) -> typing.Any:
-    """ Loads an object from the given absolute path.
+    """Loads an object from the given absolute path.
 
     Simple wrapper around the `pickle` package.
 

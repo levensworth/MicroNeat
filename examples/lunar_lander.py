@@ -5,7 +5,7 @@ import pathlib
 import gymnasium as gym
 import numpy as np
 
-from gyn_fitness import GymFitnessFunction, SpaceInvadersFitness
+from gyn_fitness import GymFitnessFunction
 from src.genome import Genome
 from src.population import Population
 from src.visualization import visualize_genome
